@@ -4,7 +4,8 @@
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Notebook In Colab"/>
 </a>
 
-We will be using a suite of pre-built pytorch segmentation models in the excellent [segmentation-models](https://github.com/qubvel/segmentation_models.pytorch) package. This package simplifies the building of a pretrained segmentation network in 2D.
+insert text here
+
 # Pre-requisites:
 - Google account
 - Basic knowledge of Python

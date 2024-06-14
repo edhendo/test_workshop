@@ -132,6 +132,30 @@ class InterpolationModGeoEC(InterpolationModBase):
 
         return self.Pi
 
+    def load_self(self, folder_path, num_epoch=None):
+        if num_epoch is None:
+            ckpt_name = "ckpt_last.pth"
+            ckpt_path = os.path.join(folder_path, ckpt_name)
+        else:
+            ckpt_name = f"ckpt_ep{num_epoch}.pth"
+            ckpt_path = os.path.join(folder_path, ckpt_name)
+
+        self.load_chkpt(ckpt_path)
+
+        if num_epoch is None:
+            print("Loaded model from ", folder_path, " with the latest weights")
+        else:
+            print("Loaded model from ", folder_path, " with the weights from epoch ", num_epoch)
+
+    def load_chkpt(self, ckpt_path):
+        ckpt = torch.load(ckpt_path, map_location=device)
+
+        self.load_state_dict(ckpt["interp_module"])
+
+        if "par" in ckpt:
+            self.param.from_dict(ckpt["par"])
+            self.param.print_self()
+
 
 ################################################################################################
 
@@ -197,7 +221,7 @@ class InterpolNet:
 
             self.i_epoch += 1
 
-    def validate(self, data_loader=None, log=True, plot_example=False):
+    def validate(self, data_loader=None, log=True, plot_example=True):
         if data_loader is None:
             data_loader = self.val_loader
 
@@ -211,7 +235,7 @@ class InterpolNet:
                 shape_x = batch_to_shape(data["X"])
                 shape_y = batch_to_shape(data["Y"])
 
-                if plot_example and i == 7:
+                if plot_example and i == 1:
                     pi = self.interp_module.match(shape_x, shape_y).detach().cpu().numpy()
                     self.plot_example(pi, shape_x.verts.detach().cpu().numpy(), shape_y.verts.detach().cpu().numpy())
                 point_pred = self.interp_module.get_pred(shape_x, shape_y)
@@ -330,6 +354,9 @@ class InterpolNet:
         # create 3D plot
         plotter_gs = pv.Plotter(off_screen=True)
         plotter_pred = pv.Plotter(off_screen=True)
+        # reorder axes for plotting
+        verts_x = verts_x[:, [0,2,1]]
+        verts_y = verts_y[:, [0,2,1]]
         # Forward assignment
         # set colors on target mesh corresponding with xyz position
         colors_y = verts_y - np.min(verts_y, axis=0)
@@ -338,13 +365,13 @@ class InterpolNet:
         # set colors on source mesh with the hard corrspondence assignment
         colors_x = colors_y[assignment]
         # add points to plotter
-        plotter_gs.add_points(verts_y, opacity=1., point_size=30, render_points_as_spheres=True, scalars=colors_y, rgb=True)
-        plotter_pred.add_points(verts_x, opacity=1., point_size=30, render_points_as_spheres=True, scalars=colors_x, rgb=True)
+        plotter_gs.add_points(verts_y, opacity=1., point_size=10, render_points_as_spheres=True, scalars=colors_y, rgb=True)
+        plotter_pred.add_points(verts_x, opacity=1., point_size=10, render_points_as_spheres=True, scalars=colors_x, rgb=True)
         plotter_gs.store_image, plotter_pred.store_image = True, True
         plotter_gs.show(window_size=[500, 500], auto_close=True)
         plotter_pred.show(window_size=[500, 500], auto_close=True)
         # jump to matplotlib
-        fig, (ax_gs, ax_pred) = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True)
+        fig, (ax_gs, ax_pred) = plt.subplots(1, 2, figsize=(12, 6.2), tight_layout=True)
         ax_gs.imshow(plotter_gs.image)
         ax_pred.imshow(plotter_pred.image)
         ax_gs.axis('off')
@@ -361,14 +388,12 @@ class timestep_settings:
 
     def update(self, interp_module, i_epoch):
         num_t_before = interp_module.param.num_timesteps
-        if i_epoch < self.increase_thresh:  # 0 - 30
+        if i_epoch < self.increase_thresh:
             return
-        elif i_epoch < self.increase_thresh * 1.5:  # 30 - 45
+        elif i_epoch < self.increase_thresh * 1.5:
             num_t = 1
-        elif i_epoch < self.increase_thresh * 1.75:  # 45 - 53
+        else:
             num_t = 3
-        else:  # > 53
-            num_t = 7
 
         if num_t_before != num_t:
             interp_module.param.num_timesteps = num_t
